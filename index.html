@@ -1,0 +1,1104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <!-- Google Analytics (GA4) -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-1CQ4D3VQ3L"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+      gtag('config', 'G-1CQ4D3VQ3L');
+    </script>
+
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Photo Corkboard</title>
+    
+    <!-- SEO Metadata -->
+    <meta name="description" content="A digital photo corkboard for organizing memories. Drag and drop photos, apply retro filters, add captions, and export high-resolution collages.">
+    <meta name="keywords" content="photo corkboard, digital collage, polaroid maker, memory board, image organizer, retro photo filters">
+    <meta name="author" content="Chris Pirillo">
+    <link rel="canonical" href="https://pirillo.com/arcade/photo-corkboard.html">
+
+    <!-- Open Graph (Facebook/LinkedIn) -->
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://pirillo.com/arcade/photo-corkboard.html">
+    <meta property="og:title" content="Photo Corkboard">
+    <meta property="og:description" content="A digital photo corkboard for organizing memories. Drag and drop photos, apply retro filters, and export high-resolution collages.">
+    <meta property="og:image" content="https://pirillo.com/arcade/images/photo-corkboard.png">
+    <meta property="og:site_name" content="Pirillo Arcade">
+
+    <!-- Twitter Card -->
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:site" content="@ChrisPirillo">
+    <meta name="twitter:creator" content="@ChrisPirillo">
+    <meta name="twitter:title" content="Photo Corkboard">
+    <meta name="twitter:description" content="Organize your photos on a digital corkboard with retro filters and export in 4K.">
+    <meta name="twitter:image" content="https://pirillo.com/arcade/images/photo-corkboard.png">
+
+    <!-- Structured Data (JSON-LD) -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "WebApplication",
+      "name": "Photo Corkboard",
+      "url": "https://pirillo.com/arcade/photo-corkboard.html",
+      "image": "https://pirillo.com/arcade/images/photo-corkboard.png",
+      "description": "A digital photo corkboard for organizing memories. Drag and drop photos, apply retro filters, and export high-resolution collages.",
+      "author": {
+        "@type": "Person",
+        "name": "Chris Pirillo",
+        "url": "https://chris.pirillo.com"
+      },
+      "applicationCategory": "MultimediaApplication",
+      "operatingSystem": "Any",
+      "offers": {
+        "@type": "Offer",
+        "price": "0",
+        "priceCurrency": "USD"
+      }
+    }
+    </script>
+
+    <!-- Performance: Resource Hints -->
+    <link rel="preconnect" href="https://cdn.tailwindcss.com">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="preconnect" href="https://unpkg.com">
+    <link rel="preconnect" href="https://cdnjs.cloudflare.com">
+
+    <!-- Tailwind CSS (Keep Sync per instruction) -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Google Fonts (Optimized Loading) -->
+    <link rel="preload" href="https://fonts.googleapis.com/css2?family=Permanent+Marker&family=Shadows+Into+Light&display=swap" as="style">
+    <link href="https://fonts.googleapis.com/css2?family=Permanent+Marker&family=Shadows+Into+Light&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
+    <noscript>
+        <link href="https://fonts.googleapis.com/css2?family=Permanent+Marker&family=Shadows+Into+Light&display=swap" rel="stylesheet">
+    </noscript>
+    
+    <!-- Lucide Icons (Sync required for inline JS execution) -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    
+    <!-- HTML2Canvas (Deferred: Only used on user interaction) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js" defer></script>
+
+    <style>
+        :root {
+            --marker-font: 'Permanent Marker', cursive;
+            --hand-font: 'Shadows Into Light', cursive;
+            --polaroid-bg: #ffffff;
+            --polaroid-shadow: 0 10px 20px rgba(0,0,0,0.15), 0 3px 6px rgba(0,0,0,0.10);
+            --polaroid-shadow-lifted: 0 25px 50px rgba(0,0,0,0.3), 0 10px 15px rgba(0,0,0,0.10);
+        }
+
+        /* Disable text selection globally, re-enable for inputs */
+        body {
+            -webkit-user-select: none;
+            -moz-user-select: none;
+            -ms-user-select: none;
+            user-select: none;
+        }
+        
+        input, textarea {
+            -webkit-user-select: text;
+            -moz-user-select: text;
+            -ms-user-select: text;
+            user-select: text;
+        }
+
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background-color: #7b5c42; /* Fallback brown */
+        }
+
+        /* Generative Cork Background */
+        #cork-bg-svg {
+            position: absolute;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 0;
+            pointer-events: none;
+        }
+
+        #corkboard {
+            width: 100%;
+            height: 100%;
+            position: relative;
+            z-index: 1;
+            cursor: grab;
+            /* Enhance 3D rendering context to reduce z-fighting/flicker */
+            perspective: 1000px; 
+        }
+
+        #corkboard:active {
+            cursor: grabbing;
+        }
+
+        /* Polaroid Structure */
+        .polaroid {
+            position: absolute;
+            background: var(--polaroid-bg);
+            padding: 12px 12px 45px 12px; /* Extra bottom padding for caption */
+            box-shadow: var(--polaroid-shadow);
+            transition: box-shadow 0.2s ease, transform 0.15s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            width: 260px;
+            cursor: grab;
+            will-change: transform, left, top;
+            display: flex;
+            flex-direction: column;
+            border-radius: 2px;
+            
+            /* Performance & Flicker Fixes */
+            -webkit-backface-visibility: hidden;
+            backface-visibility: hidden;
+            transform: translateZ(0);
+            /* Force smoother edge rendering during transform */
+            outline: 1px solid transparent;
+        }
+
+        .polaroid.is-editing {
+            cursor: default;
+            box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.6), var(--polaroid-shadow);
+            z-index: 9999 !important;
+        }
+
+        .polaroid:active:not(.is-editing) {
+            cursor: grabbing;
+            box-shadow: var(--polaroid-shadow-lifted);
+            transform: scale(1.02) !important; 
+        }
+
+        /* Image Container & Logic */
+        .polaroid-img-container {
+            width: 100%;
+            height: 240px;
+            background-color: #f8f8f8; /* Lighter background for transparent SVGs */
+            overflow: hidden;
+            position: relative;
+            border: 1px solid rgba(0,0,0,0.1);
+        }
+
+        .polaroid-img-container img {
+            position: absolute;
+            left: 50%;
+            top: 50%;
+            transform: translate(-50%, -50%) scale(1);
+            width: auto;
+            height: auto;
+            max-width: none;
+            max-height: none;
+            pointer-events: none;
+            transition: opacity 0.2s, filter 0.2s; /* Added filter transition */
+            user-select: none;
+            opacity: 0; 
+        }
+
+        .polaroid-img-container img.loaded {
+            opacity: 1;
+        }
+
+        .polaroid.is-editing img {
+            pointer-events: auto;
+            cursor: move;
+            opacity: 0.8; 
+        }
+
+        /* Caption Input */
+        .polaroid-caption {
+            position: absolute;
+            bottom: 8px;
+            left: 10px;
+            right: 10px;
+            height: 30px;
+            border: none;
+            background: transparent;
+            text-align: center;
+            font-family: var(--marker-font);
+            font-size: 1.2rem;
+            color: #222;
+            outline: none;
+            opacity: 0.9;
+            pointer-events: auto;
+        }
+        
+        .polaroid-caption::placeholder {
+            color: #999;
+            opacity: 0.4;
+            font-family: var(--hand-font);
+        }
+
+        /* Pin & Controls */
+        .pin {
+            position: absolute;
+            top: -12px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            background: radial-gradient(circle at 30% 30%, #e63946, #9d0208);
+            box-shadow: 2px 4px 6px rgba(0,0,0,0.3);
+            z-index: 10;
+            cursor: pointer;
+            pointer-events: auto;
+            transition: transform 0.2s;
+        }
+        
+        .pin:hover { transform: translateX(-50%) scale(1.2); }
+
+        .polaroid-btn {
+            position: absolute;
+            background: #fff;
+            border-radius: 50%;
+            width: 28px;
+            height: 28px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+            cursor: pointer;
+            opacity: 0;
+            transition: all 0.2s;
+            z-index: 20;
+            color: #555;
+            border: 1px solid rgba(0,0,0,0.1);
+        }
+
+        .polaroid:hover .polaroid-btn { opacity: 1; }
+        
+        /* Button Positions - Stacked on Left */
+        .delete-btn { left: -14px; top: -14px; color: #ef4444; }
+        .delete-btn:hover { background: #fee2e2; transform: scale(1.1); }
+        
+        .edit-btn { left: -14px; top: 22px; color: #3b82f6; }
+        .edit-btn:hover { background: #dbeafe; transform: scale(1.1); }
+        .edit-btn.active { background: #3b82f6; color: white; border-color: #2563eb; }
+
+        .filter-btn { left: -14px; top: 58px; color: #a855f7; }
+        .filter-btn:hover { background: #f3e8ff; transform: scale(1.1); }
+
+        /* UI Overlay */
+        .ui-overlay {
+            position: fixed;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 0.8rem;
+            z-index: 2000;
+            background: rgba(255, 255, 255, 0.95);
+            padding: 12px 24px;
+            border-radius: 50px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.15);
+            backdrop-filter: blur(8px);
+            border: 1px solid rgba(255,255,255,0.5);
+        }
+
+        .ui-btn {
+            background: transparent;
+            border: none;
+            cursor: pointer;
+            padding: 10px;
+            border-radius: 12px;
+            transition: all 0.2s;
+            color: #555;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .ui-btn:hover { background: rgba(0,0,0,0.06); color: #000; transform: translateY(-2px); }
+        .ui-btn:active { transform: translateY(0) scale(0.95); }
+
+        /* Modals */
+        .modal-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.5);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 3000;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s;
+            backdrop-filter: blur(3px);
+        }
+
+        .modal-overlay.active { opacity: 1; pointer-events: auto; }
+
+        .modal {
+            background: #fffaf0;
+            padding: 2rem;
+            border-radius: 1rem;
+            width: 90%;
+            max-width: 450px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.3);
+            transform: translateY(20px);
+            transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            border: 2px solid #e0ccb8;
+        }
+        .modal-overlay.active .modal { transform: translateY(0); }
+
+        .drop-zone-hint {
+            position: absolute;
+            inset: 20px;
+            border: 6px dashed rgba(255,255,255,0.4);
+            border-radius: 30px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.3s;
+            z-index: 500;
+            background: rgba(0,0,0,0.2);
+        }
+        .drop-zone-hint.active { opacity: 1; }
+        .drop-text {
+            font-family: var(--marker-font);
+            color: #fff;
+            font-size: 3rem;
+            transform: rotate(-3deg);
+            text-shadow: 0 4px 10px rgba(0,0,0,0.3);
+        }
+
+        .flash {
+            position: fixed;
+            inset: 0;
+            background: white;
+            z-index: 9999;
+            opacity: 0;
+            pointer-events: none;
+        }
+        .flash.active { animation: flashAnim 0.8s ease-out; }
+        @keyframes flashAnim { 0% { opacity: 1; } 100% { opacity: 0; } }
+
+        /* Helper class for 4K export container */
+        #export-container {
+            position: fixed;
+            left: -9999px;
+            top: 0;
+            width: 3840px; /* 4K Width */
+            height: 2160px; /* 4K Height */
+            overflow: hidden;
+            background-color: #7b5c42; /* Match body bg */
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Generative Cork Texture & Filters -->
+    <svg id="cork-bg-svg" width="100%" height="100%" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+        <defs>
+            <!-- Cork Texture Filter -->
+            <filter id="corkTexture">
+                <feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="3" stitchTiles="stitch" result="noise" />
+                <feDiffuseLighting in="noise" lighting-color="#dcb386" surfaceScale="1.5" result="litNoise">
+                    <feDistantLight azimuth="45" elevation="50" />
+                </feDiffuseLighting>
+                <feComponentTransfer in="litNoise" result="coloredCork">
+                     <feFuncR type="linear" slope="0.8" intercept="0.1"/> 
+                     <feFuncG type="linear" slope="0.7" intercept="0.05"/>
+                     <feFuncB type="linear" slope="0.6" intercept="0.0"/>
+                </feComponentTransfer>
+            </filter>
+        </defs>
+
+        <rect width="100%" height="100%" fill="#8a6b4e" />
+        <rect width="100%" height="100%" filter="url(#corkTexture)" opacity="0.85" />
+    </svg>
+
+    <div id="corkboard">
+        <div class="drop-zone-hint" id="dropZoneHint">
+            <span class="drop-text">Drop Photos Here!</span>
+        </div>
+        <!-- Polaroids live here -->
+    </div>
+
+    <!-- UI Controls -->
+    <div class="ui-overlay">
+        <button class="ui-btn" id="addBtn" title="Add Image URL" aria-label="Add Image URL">
+            <i data-lucide="plus" width="24" height="24"></i>
+        </button>
+        <button class="ui-btn" id="scrambleBtn" title="Organize Photos" aria-label="Organize Photos">
+            <i data-lucide="layout-grid" width="24" height="24"></i>
+        </button>
+        <button class="ui-btn" id="globalPinBtn" title="Change All Pins" aria-label="Change All Pins">
+            <i data-lucide="pin" width="24" height="24"></i>
+        </button>
+        <button class="ui-btn" id="exportBtn" title="Download 4K Wallpaper" aria-label="Download 4K Wallpaper">
+            <i data-lucide="download" width="24" height="24"></i>
+        </button>
+        <button class="ui-btn" id="clearBtn" title="Clear Board" aria-label="Clear Board">
+            <i data-lucide="trash-2" width="24" height="24"></i>
+        </button>
+        <button class="ui-btn" id="infoBtn" title="Help" aria-label="Help">
+            <i data-lucide="help-circle" width="24" height="24"></i>
+        </button>
+    </div>
+
+    <!-- Hidden Utils -->
+    <input type="file" id="fileInput" accept="image/*" multiple style="display: none;">
+    <div class="flash" id="shutterFlash"></div>
+
+    <!-- Modals -->
+    
+    <!-- URL Modal -->
+    <div class="modal-overlay" id="urlModal">
+        <div class="modal">
+            <h2 class="text-xl font-bold mb-4 font-sans text-gray-800">Add a Memory</h2>
+            
+            <button id="localUploadBtn" class="w-full py-4 border-2 border-dashed border-gray-300 rounded-xl text-gray-500 hover:border-orange-400 hover:text-orange-500 hover:bg-orange-50 transition font-sans font-bold flex flex-col items-center justify-center gap-2 mb-6 group">
+                <i data-lucide="upload" class="w-8 h-8 group-hover:scale-110 transition-transform"></i>
+                <span>Upload from Device</span>
+            </button>
+
+            <div class="flex items-center gap-3 mb-6">
+                <div class="h-px bg-gray-200 flex-1"></div>
+                <span class="text-gray-400 text-xs font-sans font-bold tracking-widest">OR PASTE URL</span>
+                <div class="h-px bg-gray-200 flex-1"></div>
+            </div>
+
+            <input type="text" id="urlInput" placeholder="https://..." 
+                class="w-full border-2 border-gray-300 rounded-lg p-3 mb-4 focus:border-orange-400 focus:outline-none transition font-sans">
+            <div class="flex justify-end gap-2">
+                <button id="cancelUrlBtn" class="px-4 py-2 rounded-lg text-gray-600 hover:bg-gray-100 transition font-sans font-medium">Cancel</button>
+                <button id="confirmUrlBtn" class="px-5 py-2 rounded-lg bg-orange-500 text-white hover:bg-orange-600 transition shadow font-sans font-bold">Add Photo</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Confirm Modal -->
+    <div class="modal-overlay" id="confirmModal">
+        <div class="modal">
+            <h2 class="text-xl font-bold mb-2 font-sans text-gray-800" id="confirmTitle">Are you sure?</h2>
+            <p class="text-gray-600 mb-6 font-sans" id="confirmText">This action cannot be undone.</p>
+            <div class="flex justify-end gap-2">
+                <button id="cancelConfirmBtn" class="px-4 py-2 rounded-lg text-gray-600 hover:bg-gray-100 transition font-sans font-medium">Keep it</button>
+                <button id="okConfirmBtn" class="px-5 py-2 rounded-lg bg-red-500 text-white hover:bg-red-600 transition shadow font-sans font-bold">Delete</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Help Modal -->
+    <div class="modal-overlay" id="helpModal">
+        <div class="modal">
+            <h2 class="text-2xl font-bold mb-4 font-sans text-gray-800 flex items-center justify-center gap-2">
+                <i data-lucide="coffee" class="text-orange-600"></i> Cozy Corkboard
+            </h2>
+            <ul class="space-y-4 font-sans text-gray-700">
+                <li class="flex items-start gap-3"><div class="bg-orange-100 p-2 rounded-full"><i data-lucide="image-plus" class="w-5 h-5 text-orange-600"></i></div> <span><strong>Add:</strong> Drag & drop multiple files or paste URLs.</span></li>
+                <li class="flex items-start gap-3"><div class="bg-blue-100 p-2 rounded-full"><i data-lucide="crop" class="w-5 h-5 text-blue-600"></i></div> <span><strong>Crop Mode:</strong> Click the blue crop icon to pan & zoom.</span></li>
+                <li class="flex items-start gap-3"><div class="bg-purple-100 p-2 rounded-full"><i data-lucide="wand-2" class="w-5 h-5 text-purple-600"></i></div> <span><strong>Filters:</strong> Click the wand icon to cycle retro filters (Sepia, B&W, Vintage, etc.).</span></li>
+                <li class="flex items-start gap-3"><div class="bg-pink-100 p-2 rounded-full"><i data-lucide="pin" class="w-5 h-5 text-pink-600"></i></div> <span><strong>Pins:</strong> Use the pin toolbar button to cycle ALL pins, or click individual pins.</span></li>
+                <li class="flex items-start gap-3"><div class="bg-green-100 p-2 rounded-full"><i data-lucide="layout-grid" class="w-5 h-5 text-green-600"></i></div> <span><strong>Organize:</strong> Click the Grid icon to randomly arrange photos on screen.</span></li>
+                <li class="flex items-start gap-3"><div class="bg-yellow-100 p-2 rounded-full"><i data-lucide="download" class="w-5 h-5 text-yellow-600"></i></div> <span><strong>Export:</strong> Downloads a 4K wallpaper with your collage centered.</span></li>
+            </ul>
+            <div class="mt-8 flex justify-end">
+                <button id="closeHelpBtn" class="px-6 py-2 rounded-lg bg-gray-800 text-white hover:bg-black transition font-sans font-bold shadow-lg">Let's Create!</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        lucide.createIcons();
+
+        // State
+        const board = document.getElementById('corkboard');
+        let zIndexCounter = 100;
+        let polaroidCount = 0;
+        let globalPinIndex = 0;
+
+        // Generic Confirmation Logic
+        let confirmCallback = null;
+        const confirmModal = document.getElementById('confirmModal');
+        const confirmTitle = document.getElementById('confirmTitle');
+        const confirmText = document.getElementById('confirmText');
+        const okConfirmBtn = document.getElementById('okConfirmBtn');
+        const cancelConfirmBtn = document.getElementById('cancelConfirmBtn');
+
+        function showConfirm(title, text, callback) {
+            confirmTitle.textContent = title;
+            confirmText.textContent = text;
+            confirmCallback = callback;
+            confirmModal.classList.add('active');
+        }
+
+        function closeConfirm() {
+            confirmModal.classList.remove('active');
+            confirmCallback = null;
+        }
+
+        okConfirmBtn.onclick = () => {
+            if (confirmCallback) confirmCallback();
+            closeConfirm();
+        };
+        cancelConfirmBtn.onclick = closeConfirm;
+
+
+        // Pin Colors
+        const PIN_STYLES = [
+            'radial-gradient(circle at 30% 30%, #ef4444, #991b1b)', // Red
+            'radial-gradient(circle at 30% 30%, #3b82f6, #1e3a8a)', // Blue
+            'radial-gradient(circle at 30% 30%, #eab308, #a16207)', // Gold
+            'radial-gradient(circle at 30% 30%, #22c55e, #14532d)', // Green
+            'radial-gradient(circle at 30% 30%, #a855f7, #581c87)', // Purple
+            'transparent' // None
+        ];
+
+        // Filter Styles
+        const FILTER_STYLES = [
+            { name: 'Normal', filter: 'none' },
+            { name: 'Vintage', filter: 'sepia(0.4) saturate(1.5) contrast(0.9) hue-rotate(-10deg)' },
+            { name: 'Noir', filter: 'grayscale(1) contrast(1.1) brightness(1.1)' },
+            { name: 'Faded', filter: 'brightness(1.1) contrast(0.85) sepia(0.3)' },
+            { name: 'Cool', filter: 'saturate(0.8) hue-rotate(20deg) contrast(1.1) brightness(1.05)' },
+            { name: 'Warm', filter: 'sepia(0.3) saturate(1.6) hue-rotate(-10deg)' },
+            { name: 'Dramatic', filter: 'contrast(1.4) saturate(1.2) sepia(0.1)' }
+        ];
+
+        // --- Drag & Drop (Files) ---
+        const dropZone = document.getElementById('dropZoneHint');
+        const fileInput = document.getElementById('fileInput');
+
+        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eName => {
+            document.body.addEventListener(eName, (e) => { e.preventDefault(); e.stopPropagation(); }, false);
+        });
+
+        document.body.addEventListener('dragenter', () => dropZone.classList.add('active'));
+        document.body.addEventListener('dragleave', (e) => {
+            if (!e.relatedTarget) dropZone.classList.remove('active');
+        });
+
+        document.body.addEventListener('drop', (e) => {
+            dropZone.classList.remove('active');
+            const files = [...e.dataTransfer.files].filter(f => f.type.startsWith('image/'));
+            handleFiles(files, e.clientX, e.clientY);
+        });
+
+        // Handle local file selection via input
+        fileInput.addEventListener('change', (e) => {
+            if (e.target.files && e.target.files.length > 0) {
+                const files = [...e.target.files].filter(f => f.type.startsWith('image/'));
+                handleFiles(files);
+                urlModal.classList.remove('active');
+                e.target.value = ''; // Reset so same file can be selected again
+            }
+        });
+
+        function handleFiles(files, dropX, dropY) {
+            files.forEach((file, i) => {
+                const reader = new FileReader();
+                reader.onloadend = () => {
+                    const spreadRadius = 250; 
+                    const angle = Math.random() * Math.PI * 2;
+                    const distance = Math.random() * (files.length > 1 ? spreadRadius : 0);
+                    
+                    const baseX = dropX || window.innerWidth / 2;
+                    const baseY = dropY || window.innerHeight / 2;
+
+                    const offsetX = Math.cos(angle) * distance;
+                    const offsetY = Math.sin(angle) * distance;
+
+                    createPolaroid(reader.result, baseX + offsetX, baseY + offsetY);
+                };
+                reader.readAsDataURL(file);
+            });
+        }
+
+        // --- Polaroid Factory ---
+        function createPolaroid(imgSrc, x, y, captionText = '', isExport = false, existingState = null) {
+            const id = 'p_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5);
+            const rotation = (Math.random() * 12) - 6; 
+            
+            const safeX = Math.max(50, Math.min(window.innerWidth - 300, x - 130)); 
+            const safeY = Math.max(50, Math.min(window.innerHeight - 300, y - 150));
+
+            const el = document.createElement('div');
+            el.classList.add('polaroid');
+            el.id = id;
+            el.style.left = isExport ? x + 'px' : `${safeX}px`;
+            el.style.top = isExport ? y + 'px' : `${safeY}px`;
+            el.style.transform = `rotate(${rotation}deg)`;
+            el.style.zIndex = ++zIndexCounter;
+
+            let editState = existingState ? { ...existingState } : {
+                scale: 1, 
+                minScale: 1, // Will be set on load
+                x: 0,
+                y: 0,
+                pinIndex: 0,
+                filterIndex: 0
+            };
+
+            const placeholderText = isExport ? '' : 'Write a caption...';
+
+            el.innerHTML = `
+                <div class="pin" title="Change Pin"></div>
+                ${!isExport ? `
+                <div class="polaroid-btn delete-btn" title="Delete">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                </div>
+                <div class="polaroid-btn edit-btn" title="Crop/Zoom">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 2v14a2 2 0 0 0 2 2h14"></path><path d="M18 22V8a2 2 0 0 0-2-2H2"></path></svg>
+                </div>
+                <div class="polaroid-btn filter-btn" title="Change Filter">
+                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m19 2 2 2-2 2-2-2 2-2Z"/><path d="m5 7 2 2-2 2-2-2 2-2Z"/><path d="m15 11 2 2-4 4-2-2 4-4Z"/><line x1="9" x2="15" y1="17" y2="11"/><line x1="12" x2="18" y1="20" y2="14"/></svg>
+                </div>
+                ` : ''}
+                <div class="polaroid-img-container">
+                    <img src="${imgSrc}" draggable="false">
+                </div>
+                <input type="text" class="polaroid-caption" placeholder="${placeholderText}" value="${captionText}" spellcheck="false">
+            `;
+
+            if (isExport) {
+                 if (existingState) {
+                    const img = el.querySelector('img');
+                    img.style.transform = `translate(calc(-50% + ${existingState.x}px), calc(-50% + ${existingState.y}px)) scale(${existingState.scale})`;
+                    img.style.filter = FILTER_STYLES[existingState.filterIndex || 0].filter;
+                    img.classList.add('loaded');
+
+                    // Apply pin state to clone
+                    const pin = el.querySelector('.pin');
+                    pin.style.background = PIN_STYLES[existingState.pinIndex || 0];
+                    if (existingState.pinIndex === 5) pin.style.boxShadow = 'none';
+                 }
+                 return el; 
+            }
+
+            board.appendChild(el);
+            polaroidCount++;
+
+            // --- Interactions ---
+            const img = el.querySelector('img');
+            const pin = el.querySelector('.pin');
+            const editBtn = el.querySelector('.edit-btn');
+            const filterBtn = el.querySelector('.filter-btn');
+            const delBtn = el.querySelector('.delete-btn');
+            const input = el.querySelector('input');
+
+            // --- Helper: Get Pan Bounds ---
+            function getPanBounds() {
+                const w = img.naturalWidth * editState.scale;
+                const h = img.naturalHeight * editState.scale;
+                const cW = 236; // container width
+                const cH = 240; // container height
+                return {
+                    x: Math.max(0, (w - cW) / 2),
+                    y: Math.max(0, (h - cH) / 2)
+                };
+            }
+
+            // --- Image Load Logic (Auto-Fit) ---
+            img.onload = () => {
+                const containerW = 236; 
+                const containerH = 240;
+                
+                const wRatio = containerW / img.naturalWidth;
+                const hRatio = containerH / img.naturalHeight;
+                const coverScale = Math.max(wRatio, hRatio);
+
+                if(!existingState) {
+                    editState.scale = coverScale;
+                    editState.minScale = coverScale; // Store minimum to prevent empty space
+                } else {
+                    editState.minScale = coverScale;
+                }
+                
+                updateImg();
+                img.classList.add('loaded');
+                el.dataset.editState = JSON.stringify(editState);
+            };
+
+            function updateImg() {
+                img.style.transform = `translate(calc(-50% + ${editState.x}px), calc(-50% + ${editState.y}px)) scale(${editState.scale})`;
+                
+                // Apply Filter
+                const currentFilter = FILTER_STYLES[editState.filterIndex || 0];
+                img.style.filter = currentFilter.filter;
+                
+                el.dataset.editState = JSON.stringify(editState);
+            }
+
+            // Button Interaction Fix: Stop Propagation
+            const buttons = [delBtn, editBtn, filterBtn];
+            buttons.forEach(btn => {
+                if(btn) {
+                    btn.addEventListener('mousedown', (e) => {
+                        e.stopPropagation(); // Critical: Prevents drag start on click
+                    });
+                }
+            });
+
+            // 1. Delete (With Modal)
+            delBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                showConfirm("Discard Memory", "Are you sure you want to remove this photo?", () => {
+                    el.style.transform = `scale(0.5) rotate(${rotation + 20}deg)`;
+                    el.style.opacity = 0;
+                    setTimeout(() => el.remove(), 250);
+                    polaroidCount--;
+                });
+            });
+
+            // 2. Pin Change
+            pin.addEventListener('click', (e) => {
+                e.stopPropagation();
+                editState.pinIndex = (editState.pinIndex + 1) % PIN_STYLES.length;
+                pin.style.background = PIN_STYLES[editState.pinIndex];
+                pin.style.boxShadow = editState.pinIndex === 5 ? 'none' : '';
+                el.dataset.editState = JSON.stringify(editState);
+            });
+
+            // 3. Edit Mode
+            editBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                el.classList.toggle('is-editing');
+                editBtn.classList.toggle('active');
+            });
+            
+            // 3.5 Filter Cycle
+            filterBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                editState.filterIndex = (editState.filterIndex + 1) % FILTER_STYLES.length;
+                updateImg();
+            });
+
+            // 4. Image Pan/Zoom
+            img.addEventListener('mousedown', (e) => {
+                if(!el.classList.contains('is-editing')) return;
+                e.preventDefault();
+                e.stopPropagation();
+
+                let startX = e.clientX;
+                let startY = e.clientY;
+                let origX = editState.x;
+                let origY = editState.y;
+
+                function onMove(me) {
+                    const dx = me.clientX - startX;
+                    const dy = me.clientY - startY;
+                    const bounds = getPanBounds();
+                    
+                    // Constrain pan to bounds
+                    editState.x = Math.max(-bounds.x, Math.min(bounds.x, origX + dx));
+                    editState.y = Math.max(-bounds.y, Math.min(bounds.y, origY + dy));
+                    
+                    updateImg();
+                }
+                function onUp() {
+                    window.removeEventListener('mousemove', onMove);
+                    window.removeEventListener('mouseup', onUp);
+                }
+                window.addEventListener('mousemove', onMove);
+                window.addEventListener('mouseup', onUp);
+            });
+
+            img.addEventListener('wheel', (e) => {
+                if(!el.classList.contains('is-editing')) return;
+                e.preventDefault();
+                const delta = e.deltaY * -0.001;
+                
+                // Smart Zoom: Limit min to minScale, limit max to 10x
+                editState.scale = Math.min(Math.max(editState.minScale, editState.scale + delta), 10);
+                
+                // Re-clamp position if zoom changes caused image to be smaller than current offset
+                const bounds = getPanBounds();
+                editState.x = Math.max(-bounds.x, Math.min(bounds.x, editState.x));
+                editState.y = Math.max(-bounds.y, Math.min(bounds.y, editState.y));
+                
+                updateImg();
+            });
+
+            // 5. Drag Polaroid
+            el.addEventListener('mousedown', (e) => {
+                if(el.classList.contains('is-editing')) return;
+                if(e.target === input || e.target === pin || e.target.closest('.polaroid-btn')) return;
+
+                el.style.zIndex = ++zIndexCounter;
+                let startX = e.clientX;
+                let startY = e.clientY;
+                let rect = el.getBoundingClientRect();
+                let offsetX = startX - rect.left;
+                let offsetY = startY - rect.top;
+
+                el.style.transition = 'none';
+
+                function onMove(me) {
+                    let newX = me.clientX - offsetX;
+                    let newY = me.clientY - offsetY;
+                    // Bounds Check
+                    newX = Math.max(-50, Math.min(window.innerWidth - 200, newX));
+                    newY = Math.max(-50, Math.min(window.innerHeight - 200, newY));
+                    el.style.left = newX + 'px';
+                    el.style.top = newY + 'px';
+                }
+
+                function onUp() {
+                    window.removeEventListener('mousemove', onMove);
+                    window.removeEventListener('mouseup', onUp);
+                    el.style.transition = 'box-shadow 0.2s ease, transform 0.15s';
+                }
+
+                window.addEventListener('mousemove', onMove);
+                window.addEventListener('mouseup', onUp);
+            });
+
+            input.addEventListener('mousedown', e => e.stopPropagation());
+
+            el.animate([
+                { transform: `scale(0.8) rotate(${rotation}deg)`, opacity: 0 },
+                { transform: `scale(1) rotate(${rotation}deg)`, opacity: 1 }
+            ], { duration: 300, easing: 'ease-out' });
+        }
+
+        // --- Global Actions ---
+
+        // Global Pin Button
+        document.getElementById('globalPinBtn').addEventListener('click', () => {
+            globalPinIndex = (globalPinIndex + 1) % PIN_STYLES.length;
+            
+            const cards = document.querySelectorAll('.polaroid');
+            cards.forEach(card => {
+                const pin = card.querySelector('.pin');
+                
+                pin.style.background = PIN_STYLES[globalPinIndex];
+                pin.style.boxShadow = globalPinIndex === 5 ? 'none' : '';
+                
+                // Update internal state
+                const state = JSON.parse(card.dataset.editState || '{}');
+                state.pinIndex = globalPinIndex;
+                card.dataset.editState = JSON.stringify(state);
+            });
+        });
+
+        document.getElementById('scrambleBtn').addEventListener('click', () => {
+            // Convert to Array and Shuffle
+            const cards = Array.from(document.querySelectorAll('.polaroid'));
+            cards.sort(() => Math.random() - 0.5);
+
+            const screenW = window.innerWidth;
+            const screenH = window.innerHeight;
+            
+            // Dimensions & Margins
+            const cardW = 260;
+            const cardH = 320;
+            const margin = 50; // Safety buffer
+            const usableW = screenW - (margin * 2);
+            const usableH = screenH - (margin * 2);
+            
+            const n = cards.length;
+            if (n === 0) return;
+
+            // Calculate grid cols/rows
+            const screenRatio = screenW / screenH;
+            let cols = Math.ceil(Math.sqrt(n * screenRatio));
+            let rows = Math.ceil(n / cols);
+            
+            // Calculate basic required spacing
+            let xSpace = cardW + 20; 
+            let ySpace = cardH + 20;
+
+            // SQUEEZE LOGIC: If total width exceeds screen, reduce spacing (overlap)
+            if (cols * xSpace > usableW) {
+                xSpace = (usableW - cardW) / Math.max(1, cols - 1);
+            }
+            if (rows * ySpace > usableH) {
+                ySpace = (usableH - cardH) / Math.max(1, rows - 1);
+            }
+            
+            // Calculate total block size with new spacing
+            const totalGridW = (cols - 1) * xSpace + cardW;
+            const totalGridH = (rows - 1) * ySpace + cardH;
+            
+            // Calculate top-left start to CENTER the block
+            const startX = margin + (usableW - totalGridW) / 2;
+            const startY = margin + (usableH - totalGridH) / 2;
+
+            cards.forEach((card, i) => {
+                const col = i % cols;
+                const row = Math.floor(i / cols);
+                
+                const randomX = (Math.random() * 30) - 15;
+                const randomY = (Math.random() * 30) - 15;
+                const rot = (Math.random() * 12) - 6;
+
+                // Base pos + Grid offset + Random jitter
+                let x = startX + (col * xSpace) + randomX;
+                let y = startY + (row * ySpace) + randomY;
+                
+                // Final safety clamp to keep inside viewport
+                x = Math.max(10, Math.min(screenW - cardW - 10, x));
+                y = Math.max(10, Math.min(screenH - cardH - 10, y));
+
+                // Use specific transitions
+                card.style.transition = "left 0.6s cubic-bezier(0.2, 1, 0.3, 1), top 0.6s cubic-bezier(0.2, 1, 0.3, 1), transform 0.6s cubic-bezier(0.2, 1, 0.3, 1)";
+                
+                card.style.left = x + 'px';
+                card.style.top = y + 'px';
+                card.style.transform = `rotate(${rot}deg)`;
+                card.style.zIndex = ++zIndexCounter;
+            });
+        });
+
+        document.getElementById('exportBtn').addEventListener('click', async () => {
+            const cards = document.querySelectorAll('.polaroid');
+            if(cards.length === 0) return alert("Nothing to export!");
+
+            const flash = document.getElementById('shutterFlash');
+            flash.classList.add('active');
+            setTimeout(() => flash.classList.remove('active'), 800);
+
+            // 1. Setup Export Canvas
+            const exportContainer = document.createElement('div');
+            exportContainer.id = 'export-container';
+            const bgClone = document.getElementById('cork-bg-svg').cloneNode(true);
+            exportContainer.appendChild(bgClone);
+            document.body.appendChild(exportContainer);
+
+            // 2. Calculate Layout from CSS Positions
+            let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+            const cardWidth = 260;
+            const cardHeight = 297; 
+
+            cards.forEach(c => {
+                const x = parseFloat(c.style.left);
+                const y = parseFloat(c.style.top);
+                minX = Math.min(minX, x);
+                minY = Math.min(minY, y);
+                maxX = Math.max(maxX, x + cardWidth);
+                maxY = Math.max(maxY, y + cardHeight);
+            });
+
+            const contentWidth = maxX - minX;
+            const contentHeight = maxY - minY;
+            
+            // 3. Create Wrapper for perfect centering
+            const wrapper = document.createElement('div');
+            wrapper.style.position = 'absolute';
+            wrapper.style.left = '50%';
+            wrapper.style.top = '50%';
+            wrapper.style.width = contentWidth + 'px';
+            wrapper.style.height = contentHeight + 'px';
+            wrapper.style.transformOrigin = 'center center';
+            
+            // Calculate Scale for 4K fitting (90% safe area)
+            const TARGET_W = 3840;
+            const TARGET_H = 2160;
+            const scaleX = (TARGET_W * 0.9) / contentWidth;
+            const scaleY = (TARGET_H * 0.9) / contentHeight;
+            const globalScale = Math.min(scaleX, scaleY); 
+            
+            // Center the wrapper and scale it
+            wrapper.style.transform = `translate(-50%, -50%) scale(${globalScale})`;
+            
+            exportContainer.appendChild(wrapper);
+
+            // 4. Clone and place cards into wrapper
+            cards.forEach(card => {
+                const img = card.querySelector('img').src;
+                const caption = card.querySelector('input').value;
+                const baseTransform = card.style.transform; 
+                const state = JSON.parse(card.dataset.editState || '{}');
+
+                const clone = createPolaroid(img, 0, 0, caption, true, state);
+                
+                // Position relative to the bounding box origin
+                const relX = parseFloat(card.style.left) - minX;
+                const relY = parseFloat(card.style.top) - minY;
+
+                clone.style.left = relX + 'px';
+                clone.style.top = relY + 'px';
+                clone.style.transform = baseTransform; // Keep individual rotation
+                
+                // Copy Z-Index from Original
+                clone.style.zIndex = card.style.zIndex;
+
+                // Explicitly set border and stronger shadow for export clarity
+                clone.style.boxShadow = '0 20px 40px rgba(0,0,0,0.4)'; 
+                clone.style.border = '1px solid rgba(0,0,0,0.15)'; 
+
+                wrapper.appendChild(clone);
+            });
+
+            // 5. Render
+            try {
+                const canvas = await html2canvas(exportContainer, {
+                    width: TARGET_W,
+                    height: TARGET_H,
+                    scale: 1, 
+                    useCORS: true,
+                    backgroundColor: '#8a6b4e',
+                    logging: false
+                });
+                const link = document.createElement('a');
+                link.download = `CozyWallpaper-${Date.now()}.png`;
+                link.href = canvas.toDataURL('image/png', 0.9);
+                link.click();
+            } catch (err) {
+                console.error(err);
+                alert("Export failed. Note: CORS images may block high-res export.");
+            } finally {
+                document.body.removeChild(exportContainer);
+            }
+        });
+
+        // Delete All (With Modal)
+        document.getElementById('clearBtn').addEventListener('click', () => {
+            showConfirm("Clear Board?", "This will remove every photo. Are you sure?", () => {
+                const cards = document.querySelectorAll('.polaroid');
+                cards.forEach((c, i) => {
+                    setTimeout(() => {
+                        c.style.transform = "scale(0) rotate(180deg)";
+                        c.style.opacity = 0;
+                        setTimeout(() => c.remove(), 300);
+                    }, i * 50);
+                });
+            });
+        });
+
+        const urlModal = document.getElementById('urlModal');
+        const urlInput = document.getElementById('urlInput');
+        document.getElementById('addBtn').onclick = () => { urlModal.classList.add('active'); urlInput.focus(); };
+        
+        // Local Upload Button in Modal
+        document.getElementById('localUploadBtn').onclick = () => {
+            fileInput.click();
+        };
+
+        document.getElementById('cancelUrlBtn').onclick = () => urlModal.classList.remove('active');
+        document.getElementById('confirmUrlBtn').onclick = () => {
+            if(urlInput.value) {
+                createPolaroid(urlInput.value);
+                urlModal.classList.remove('active');
+                urlInput.value = '';
+            }
+        };
+
+        const helpModal = document.getElementById('helpModal');
+        document.getElementById('infoBtn').onclick = () => helpModal.classList.add('active');
+        document.getElementById('closeHelpBtn').onclick = () => helpModal.classList.remove('active');
+
+        window.onload = () => {
+            const emojis = ['🌿', '🍄', '🌻', '🌵', '📷', '✨', '🌸', '🪴'];
+            const randomEmoji = emojis[Math.floor(Math.random() * emojis.length)];
+            
+            // Random Position
+            const randX = Math.random() * (window.innerWidth - 300) + 50;
+            const randY = Math.random() * (window.innerHeight - 350) + 50;
+
+            const svg = `data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='200' height='200' viewBox='0 0 100 100'><text y='50%' x='50%' dy='0.35em' text-anchor='middle' font-size='60'>${randomEmoji}</text></svg>`;
+
+            createPolaroid(svg, randX, randY, "Welcome home 🌿");
+        };
+    </script>
+</body>
+</html>
